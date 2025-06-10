@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>나만의 암호 변환기 (메모장 테마)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ----- '손글씨 메모장' 테마 by Gemini (레이아웃 수정 버전 2) ----- */
+        body {
+            font-family: 'Gaegu', cursive;
+            font-weight: 700;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            background-color: #fdfaf4;
+            color: #5d534a;
+            min-height: 95vh;
+        }
+        h1 {
+            color: #d98a8a;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h2 {
+            font-size: 1.5em;
+            color: #a78f80;
+        }
+        #mainContent {
+            display: none; width: 100%; flex-direction: column; align-items: center;
+        }
+        .container {
+            width: 90%;
+            max-width: 1500px;
+            display: flex;
+            gap: 20px;
+            align-items: stretch;
+        }
+        .main-box {
+            flex: 3; /* [변경] 비율을 2에서 3으로 늘려 이 영역을 더 넓게 만듭니다 */
+            display: flex;
+            gap: 20px;
+        }
+        .rules-box {
+            flex: 1; /* 오른쪽 규칙 영역이 1의 비율을 차지 */
+            display: flex;
+            flex-direction: column;
+        }
+        .box {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s ease-in-out;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .box:hover, .rules-box:hover {
+            transform: translateY(-5px);
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 15px;
+            border: 2px solid #e6d1d1;
+            border-radius: 10px;
+            font-size: 18px;
+            font-family: 'Gaegu', cursive;
+            resize: vertical;
+            box-sizing: border-box;
+            background-color: #fffefb;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            flex-grow: 1;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #d98a8a;
+            box-shadow: 0 0 10px rgba(217, 138, 138, 0.2);
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            align-items: center;
+        }
+        button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 20px;
+            background-color: #d98a8a;
+            color: white;
+            font-size: 16px;
+            font-family: 'Gaegu', cursive;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button:hover {
+            background-color: #c77a7a;
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        button.clear {
+            background-color: #a78f80;
+        }
+        button.clear:hover {
+            background-color: #8e786a;
+        }
+        .char-count { font-size: 14px; color: #666; margin-left: auto; }
+        .warning { margin-top: 20px; font-size: 14px; color: #d93025; text-align: center; font-weight: bold; }
+    </style>
+
+</head>
+<body>
+
+<div id="mainContent">
+    <h1>나만의 암호 변환기<br>(손글씨 메모장 테마)</h1>
+    <div class="container">
+        <div class="main-box" style="display: flex; gap: 20px;">
+            <div class="box"><h2>한글 입력</h2><textarea id="koreanInput" placeholder="한글을 입력하세요..."></textarea><div class="controls"><button id="copyKoreanBtn">한글 복사</button><button id="clearAllBtn" class="clear">전체 삭제</button><div id="koreanCharCount" class="char-count">0자</div></div></div>
+            <div class="box"><h2>코드 변환</h2><textarea id="codeInput" placeholder="코드를 입력하세요..."></textarea><div class="controls"><button id="copyCodeBtn">코드 복사</button><div id="codeCharCount" class="char-count">0자</div></div></div>
+        </div>
+        <div class="rules-box"><h2>변환 규칙</h2><textarea id="rulesTextarea"></textarea><div class="controls"><button id="applyRulesBtn">규칙 적용</button></div></div>
+    </div>
+    <div class="warning">⚠️ 이 도구는 규칙 테스트 및 교육용입니다.</div>
+</div>
+
+<script>
+    // --- 변수 및 상수 정의 ---
+    const koreanTextarea = document.getElementById('koreanInput');
+    const codeTextarea = document.getElementById('codeInput');
+    const rulesTextarea = document.getElementById('rulesTextarea');
+    const applyRulesBtn = document.getElementById('applyRulesBtn');
+    const copyKoreanBtn = document.getElementById('copyKoreanBtn');
+    const copyCodeBtn = document.getElementById('copyCodeBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const koreanCharCount = document.getElementById('koreanCharCount');
+    const codeCharCount = document.getElementById('codeCharCount');
+    let korToEng = {}, engToKor = {};
+
+    // --- 한글 구성 상수 ---
+    const KOREAN_START_CODE = 44032; // '가'의 유니코드 코드 포인트
+    const CHOSEONG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+    const JUNGSEONG = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
+    const JONGSEONG = ['', 'ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+    
+    // --- 조합 규칙 상수 ---
+    const JUNGSEONG_COMBINATIONS = { 'ㅗㅏ':'ㅘ', 'ㅗㅐ':'ㅙ', 'ㅗㅣ':'ㅚ', 'ㅜㅓ':'ㅝ', 'ㅜㅔ':'ㅞ', 'ㅜㅣ':'ㅟ', 'ㅡㅣ':'ㅢ' };
+    const JONGSEONG_COMBINATIONS = { 'ㄱㅅ':'ㄳ', 'ㄴㅈ':'ㄵ', 'ㄴㅎ':'ㄶ', 'ㄹㄱ':'ㄺ', 'ㄹㅁ':'ㄻ', 'ㄹㅂ':'ㄼ', 'ㄹㅅ':'ㄽ', 'ㄹㅌ':'ㄾ', 'ㄹㅍ':'ㄿ', 'ㄹㅎ':'ㅀ', 'ㅂㅅ':'ㅄ' };
+    
+    // [수정됨] 겹받침 분해 규칙 추가
+    const REVERSE_JONGSEONG_COMBINATIONS = {
+        'ㄳ': ['ㄱ', 'ㅅ'], 'ㄵ': ['ㄴ', 'ㅈ'], 'ㄶ': ['ㄴ', 'ㅎ'],
+        'ㄺ': ['ㄹ', 'ㄱ'], 'ㄻ': ['ㄹ', 'ㅁ'], 'ㄼ': ['ㄹ', 'ㅂ'],
+        'ㄽ': ['ㄹ', 'ㅅ'], 'ㄾ': ['ㄹ', 'ㅌ'], 'ㄿ': ['ㄹ', 'ㅍ'],
+        'ㅀ': ['ㄹ', 'ㅎ'], 'ㅄ': ['ㅂ', 'ㅅ']
+    };
+
+    // --- 함수 정의 ---
+
+    // 규칙 텍스트를 파싱하여 변환 맵(korToEng, engToKor)을 생성하는 함수
+    function parseAndApplyRules() {
+        korToEng = {}; engToKor = {};
+        const rules = rulesTextarea.value.split('\n');
+        rules.forEach(line => {
+            if (line.startsWith('#') || line.trim() === '') return; // 주석이나 빈 줄은 무시
+            const parts = line.split(':');
+            if (parts.length === 2) {
+                const kor = parts[0].trim();
+                const eng = parts[1].trim();
+                if (kor && eng) { korToEng[kor] = eng; engToKor[eng] = kor; }
+            }
+        });
+        updateConversion(true); // 규칙 적용 후 한글->코드 변환을 다시 실행
+    }
+    
+    // 한글 텍스트를 코드로 변환하는 함수
+    function convertToCode(koreanText) {
+        let result = "";
+        for (const char of koreanText) {
+            const charCode = char.charCodeAt(0);
+            if (charCode >= KOREAN_START_CODE && charCode <= 55203) { // 한글 음절 범위 확인
+                const baseCode = charCode - KOREAN_START_CODE;
+                const jongseongIndex = baseCode % 28;
+                const jungseongIndex = ((baseCode - jongseongIndex) / 28) % 21;
+                const choseongIndex = Math.floor(((baseCode - jongseongIndex) / 28) / 21);
+                
+                result += korToEng[CHOSEONG[choseongIndex]] || CHOSEONG[choseongIndex];
+                result += korToEng[JUNGSEONG[jungseongIndex]] || JUNGSEONG[jungseongIndex];
+                if (jongseongIndex > 0) result += korToEng[JONGSEONG[jongseongIndex]] || JONGSEONG[jongseongIndex];
+            } else { // 한글 음절이 아닌 경우 (자모, 특수문자 등)
+                result += korToEng[char] || char; 
+            }
+        }
+        return result;
+    }
+    
+    // [수정됨] 코드를 한글 텍스트로 변환하는 함수 (겹받침 로직 수정)
+    function convertToKorean(codeText) {
+        let jamoStream = [];
+        const sortedCodes = Object.keys(engToKor).sort((a, b) => b.length - a.length);
+        let i = 0;
+        while (i < codeText.length) {
+            let found = false;
+            for (const code of sortedCodes) {
+                if (codeText.substring(i, i + code.length) === code) {
+                    jamoStream.push(engToKor[code]); i += code.length; found = true; break;
+                }
+            }
+            if (!found) { jamoStream.push(codeText[i]); i++; }
+        }
+
+        let result = "", buffer = [];
+        const commitSyllable = () => {
+            if (buffer.length === 0) return;
+            const [ch, ju, jo] = buffer;
+            if (!CHOSEONG.includes(ch)) { result += buffer.join(''); buffer = []; return; }
+            if (!ju) { result += ch; buffer = []; return; }
+            const chIndex = CHOSEONG.indexOf(ch), juIndex = JUNGSEONG.indexOf(ju), joIndex = jo ? JONGSEONG.indexOf(jo) : 0;
+            if (chIndex === -1 || juIndex === -1 || joIndex === -1) {
+                result += buffer.join(''); buffer = []; return;
+            }
+            result += String.fromCharCode(KOREAN_START_CODE + (chIndex * 21 * 28) + (juIndex * 28) + joIndex);
+            buffer = [];
+        };
+
+        for (const jamo of jamoStream) {
+            if (jamo === ' ') {
+                commitSyllable(); result += ' '; continue;
+            }
+
+            if (buffer.length === 0) {
+                if (CHOSEONG.includes(jamo)) buffer.push(jamo); else result += jamo;
+            } else if (buffer.length === 1) {
+                if (JUNGSEONG.includes(jamo)) buffer.push(jamo);
+                else { commitSyllable(); if (CHOSEONG.includes(jamo)) buffer.push(jamo); else result += jamo; }
+            } else if (buffer.length === 2) {
+                const [ch, ju] = buffer;
+                const combinedJung = JUNGSEONG_COMBINATIONS[ju + jamo];
+                if (JONGSEONG.includes(jamo) && JONGSEONG.indexOf(jamo) !== 0) { buffer.push(jamo); }
+                else if (JUNGSEONG.includes(jamo) && combinedJung) { buffer[1] = combinedJung; }
+                else { commitSyllable(); if (CHOSEONG.includes(jamo)) buffer.push(jamo); else result += jamo; }
+            } else if (buffer.length === 3) {
+                const [ch, ju, jo] = buffer;
+                const isNextJamoJungseong = JUNGSEONG.includes(jamo);
+                const combinedJong = JONGSEONG_COMBINATIONS[jo + jamo];
+
+                if (isNextJamoJungseong) {
+                    const splittableJong = REVERSE_JONGSEONG_COMBINATIONS[jo];
+                    if (splittableJong) { // 겹받침이고 뒤에 모음이 오는 경우 (예: '닭이'의 '닭ㅇ')
+                        const [first, second] = splittableJong;
+                        buffer[2] = first;       // 앞 글자의 받침을 겹받침의 첫 자음으로 바꿈 ('ㄷㅏㄺ' -> 'ㄷㅏㄹ')
+                        commitSyllable();        // 앞 글자를 완성 ('달')
+                        buffer.push(second, jamo); // 새 글자의 초성과 중성을 buffer에 넣음 (['ㄱ', 'ㅣ'])
+                    } else { // 홑받침이고 뒤에 모음이 오는 경우 (예: '국이'의 '국ㅇ')
+                        buffer.pop();            // 받침을 제거 ('ㄱㅜㄱ' -> 'ㄱㅜ')
+                        commitSyllable();        // 앞 글자를 완성 ('구')
+                        buffer.push(jo, jamo);   // 새 글자의 초성과 중성을 buffer에 넣음 (['ㄱ', 'ㅣ'])
+                    }
+                } else if (combinedJong) { // 뒤에 자음이 와서 새로운 겹받침이 되는 경우 (예: '않'의 '안ㅎ')
+                    buffer[2] = combinedJong;
+                } else { // 더이상 조합이 불가능한 경우
+                    commitSyllable();
+                    if (CHOSEONG.includes(jamo)) buffer.push(jamo); else result += jamo;
+                }
+            }
+        }
+        commitSyllable();
+        return result;
+    }
+
+    // 글자 수를 업데이트하는 함수
+    function updateCharCounts() { 
+        koreanCharCount.textContent = `${koreanTextarea.value.length}자`; 
+        codeCharCount.textContent = `${codeTextarea.value.length}자`; 
+    }
+    
+    // 입력에 따라 변환을 업데이트하는 함수
+    function updateConversion(isKoreanToCode) {
+        if (isKoreanToCode) { 
+            codeTextarea.value = convertToCode(koreanTextarea.value); 
+        } else { 
+            koreanTextarea.value = convertToKorean(codeTextarea.value); 
+        }
+        updateCharCounts();
+    }
+    
+    // --- 이벤트 리스너 설정 ---
+    koreanTextarea.addEventListener('input', () => updateConversion(true));
+    codeInput.addEventListener('input', () => updateConversion(false));
+    applyRulesBtn.addEventListener('click', parseAndApplyRules);
+    clearAllBtn.addEventListener('click', () => { 
+        koreanTextarea.value = ''; 
+        codeTextarea.value = ''; 
+        updateCharCounts(); 
+    });
+    copyKoreanBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(koreanTextarea.value).then(() => alert('한글 내용이 복사되었습니다.'));
+    });
+    copyCodeBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(codeTextarea.value).then(() => alert('코드 내용이 복사되었습니다.'));
+    });
+    
+    // --- 초기화 함수 ---
+    function initialize() {
+        const defaultRules = `# --- 자음 규칙 ---
+ㄱ:그
+ㄲ:기
+ㄴ:느
+ㄷ:드
+ㄸ:디
+ㄹ:르
+ㅁ:므
+ㅂ:브
+ㅃ:비
+ㅅ:스
+ㅆ:시
+ㅇ:으
+ㅈ:즈
+ㅉ:지
+ㅊ:츠
+ㅋ:크
+ㅌ:트
+ㅍ:프
+ㅎ:흐
+# --- 겹받침 규칙 ---
+ㄳ:그스
+ㄵ:느즈
+ㄶ:느흐
+ㄺ:르그
+ㄻ:르므
+ㄼ:르브
+ㄽ:르스
+ㄾ:르트
+ㄿ:르프
+ㅀ:르흐
+ㅄ:브스
+# --- 모음 규칙 ---
+ㅏ:1
+ㅐ:10
+ㅑ:❤
+ㅒ:❤0
+ㅓ:🍀
+ㅔ:🍀0
+ㅕ:4
+ㅖ:40
+ㅗ:δ
+ㅘ:δ1
+ㅙ:δ10
+ㅚ:δ0
+ㅛ:6
+ㅜ:Ͳ
+ㅝ:Ͳ🍀
+ㅞ:Ͳ🍀0
+ㅟ:Ͳ0
+ㅠ:8
+ㅡ:9
+ㅢ:90
+ㅣ:0`;
+        rulesTextarea.value = defaultRules;
+        parseAndApplyRules(); // 페이지 로드 시 기본 규칙을 적용
+    }
+    
+    // 페이지 로드 시 초기화 함수 실행
+    initialize();
+</script>
+
+<script>
+    // --- 페이지 접근 비밀번호 스크립트 ---
+    (function() {
+        const correctPassword = "7295"; 
+        const enteredPassword = prompt("사이트 암호를 입력하세요:", "");
+        if (enteredPassword === correctPassword) {
+            document.getElementById("mainContent").style.display = 'flex';
+        } else if (enteredPassword !== null) {
+            alert("암호가 틀렸습니다!");
+            document.body.innerHTML = '<h1 style="text-align:center; margin-top: 50px; color: #5d534a; font-family: \'Gaegu\', cursive;">접근이 거부되었습니다.</h1>';
+        } else {
+             document.body.innerHTML = '<h1 style="text-align:center; margin-top: 50px; color: #5d534a; font-family: \'Gaegu\', cursive;">접근이 취소되었습니다.</h1>';
+        }
+    })();
+</script>
+
+</body>
+</html>
